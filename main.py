@@ -1,8 +1,17 @@
 import streamlit as st
+# Data manipulation
+import numpy as np
 import pandas as pd
+# Visualization
 import plotly.express as px
+# Data normalization
+from sklearn.preprocessing import MinMaxScaler 
+# Kearning models
+from keras.models import Sequential
+from keras.layers import LSTM, Dense
 
-# Configuración de la página
+
+# Page configuration
 st.set_page_config(
     page_title="Stock Market Predictor App",
     page_icon="📈",
@@ -23,19 +32,21 @@ with header:
     st.markdown("You can find the full project in [this GitHub repository](https://github.com/rodrigo-dls/StockMarket-LSTM-Model/tree/master)", unsafe_allow_html=True)
 
 # Dataset
+data = pd.read_csv('AAPL_2006-01-01_to_2018-01-01.csv', index_col='Date', parse_dates=['Date'] )
 with dataset:
     st.header("Apple Stock Market Dataset")
     st.markdown("I found this dataset on Kaggle. [Link to dataset](https://www.kaggle.com/dataset)")
     
     # Table
-    data = pd.read_csv('AAPL_2006-01-01_to_2018-01-01.csv', index_col='Date', parse_dates=['Date'] )
     st.dataframe(data, height= 230)
     
     # Visualization
     st.subheader("Dataset Visualization")
-    fig = px.line(data.tail(100), x=data.tail(100).index, y='High', title='Highest stock price of the last 100 days of the dataset', line_shape='linear', line_dash_sequence=['solid'])
+    fig = px.line(
+                data.tail(100), x=data.tail(100).index, y=['High', 'Low'], 
+                title='Evolution of High and Low stock price over the last 100 days of the dataset',
+                line_shape='linear', line_dash_sequence=['solid'])
     fig.update_xaxes(title_text='Date')
-    fig.update_traces(line=dict(color='orange'))
     st.plotly_chart(fig)
 
 # Features
@@ -51,22 +62,54 @@ with features:
         '''
     )
 
+
 with model_training:
     st.header("Time to train the model!")
     st.markdown(
         "Here you get to choose the hyperparameters of the model and see how the performance changes!"
     )
     sel_col, disp_col = st.columns(2)
-    max_depth = sel_col.slider(
-        "What should be the max_depth of the model?",
+    units_number = sel_col.slider(
+        "What should be the number of neurons of the model?",
         min_value=10,
-        max_value=100,
-        value=20,
+        max_value=50,
+        value=30,
         step=10,
     )
-    n_estimators = sel_col.selectbox(
-        "How many trees should there be?", options=[100, 200, 300, "No limit"], index=0
+    # n_estimators = sel_col.selectbox(
+    #     "How many trees should there be?", options=[100, 200, 300, "No limit"], index=0
+    # )
+    input_feature = sel_col.selectbox(
+        "Which feature should be used as the input feature?", options=['High', 'Low','Open','Close'], index=0
     )
-    input_feature = sel_col.text_input(
-        "Which feature should be used as the input feature?", "High"
-    )
+    
+# Data Split
+training_set = data.loc[:'2016','High']
+validation_set = data.loc['2017':,'High']
+
+# Data Normalization
+sc = MinMaxScaler(feature_range=(0,1))
+training_set_sc = sc.fit_transform(pd.DataFrame(training_set))
+validation_set_sc = sc.transform(pd.DataFrame(validation_set))
+
+# Define data size for the model
+time_step = 60  # block size
+m = len(training_set_sc) # iteration limit
+X_train = []
+Y_train = []
+for i in range(time_step, m):
+  X_train.append(training_set_sc[i-time_step:i,0])
+  Y_train.append(training_set_sc[i,0])  # the data immediately following that of the block
+X_train, Y_train = np.array(X_train), np.array(Y_train) # previous data format is returned to continue working
+X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))  # reshapes it to feed it to the model
+
+# Creates the model
+input_dim = (X_train.shape[1],1) # (timesteps, features)
+output_dim = 1
+na = units_number # number of units (neurons)
+
+model = Sequential()
+model.add(LSTM(units=na, input_shape=input_dim))    # LSTM Layer
+model.add(Dense(units=output_dim))  # Output Layer (without activation function)
+model.compile(optimizer='rmsprop', loss='mse')  # Compilation
+
