@@ -32,15 +32,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Authenticate to Firestore with the JSON account key.
-db = firestore.Client.from_service_account_json("firestore-key.json")
-
-# Create a reference to the Google post.
-doc_ref = db.collection("records").document("tjuxpBn3KLlBPyMU0qio")
-
-# Then get the data at that reference.
-doc = doc_ref.get()
-
 # # Cargar el dataset existente si lo hay
 # try:
 #     df = pd.read_csv("training_records.csv")
@@ -50,6 +41,11 @@ doc = doc_ref.get()
 
 
 
+@st.cache_data
+def connect_db(credential_file):
+    # Authenticate to Firestore with the JSON account key.
+    db = firestore.Client.from_service_account_json(credential_file)
+    return db
 
 @st.cache_data
 def get_data_with_date_index(filename):
@@ -77,6 +73,8 @@ def register_training_data(input_feature, n_epochs, n_batch, units_number, metri
     # Add new row to record_df
     record_df.loc[len(record_df.index)] = new_row
 
+    db = connect_db("firestore_key.json")
+
     doc_ref = db.collection('records').document()
     doc_ref.set({
         'feature': input_feature,
@@ -86,7 +84,7 @@ def register_training_data(input_feature, n_epochs, n_batch, units_number, metri
         'n_batch': n_batch,
         'n_epochs': n_epochs,
         'n_neurons': units_number,
-        'timestamps': formatted_timestamp
+        'timestamp': formatted_timestamp
     })
 
     return record_df
@@ -412,11 +410,25 @@ with training_record:
     # Mostrar el DataFrame actualizado
     st.dataframe(record_df)
 
-top_test.dataframe(record_df)
+
+# Get all documents within the collection
+docs = db.collection("records").stream()
 
 with top_test:
-    # Then query to list all users
-    records_ref = db.collection('records')
+    st.subheader("Testing here:")
+    top_test.dataframe(record_df)
 
-    for doc in records_ref.stream():
-        st.write('{} => {}'.format(doc.id, doc.to_dict()['mse']))
+    # Iterate through the documents and display the fields
+    for doc in docs:
+        print(f"Campos del documento {doc.id}:")
+        data = doc.to_dict()
+        for key, value in data.items():
+            print(f"{key}: {value}")
+
+
+    # # Then query to list all users
+    # records_ref = db.collection('records')
+
+    # for doc in records_ref.stream():
+    #     st.write(doc.id)
+    #     st.write('{} => {}'.format(doc.id, doc.to_dict()['mse']))
