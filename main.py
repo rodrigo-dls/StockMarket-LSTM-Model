@@ -23,24 +23,11 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 # Cloud Database connection
 from google.cloud import firestore
 
-# <----------- Mirar -----------> 
-#  Este bien fijar la randomibilidad para el uso de la aplicacion?
 tf.random.set_seed(4)
 
 # ***************
 # Cache
 # ***************
-
-# <----------- Mirar -----------> 
-# La fc en cache para conectar al db da error, vale la pena hacerlo?
-
-# @st.cache_data
-# def connect_db(credential_file):
-#     # Authenticate to Firestore DB with the JSON account key.
-#     db = firestore.Client.from_service_account_json(credential_file)
-#     return db
-
-# <-------- Hasta aca----------->
 
 @st.cache_data
 def get_data_with_date_index(filename):
@@ -65,25 +52,6 @@ def add_new_training_data(input_feature, n_epochs, n_batch, units_number, metric
     # Get the current datetime in string format
     timestamp = datetime.datetime.now()
     formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S') # format the date and time into a string
-
-    # <----------- Mirar -----------> 
-    # Es necesario crear esta funcion? Donde mas la usaria? Porque quiero cargar las fechas en formato string y no fechas
-
-    # @st.cache_data
-    # def get_formatted_timestamp():
-    #     """
-    #     Get the current datetime in string format.
-
-    #     Returns:
-    #         str: Formatted timestamp (YYYY-MM-DD HH:mm:ss).
-    #     """
-    #     timestamp = datetime.datetime.now()
-    #     formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
-    #     return formatted_timestamp
-    
-    # current_timestamp = get_formatted_timestamp()
-
-    # <-------- Hasta aca----------->
 
     # Store selected parameters
     new_inputs = [input_feature, n_epochs, n_batch, units_number]
@@ -437,30 +405,3 @@ doc_ref.set({
 # Retrieve all data from DB (still on test stage)
 # ***********************************
 
-# Get all documents within the collection
-docs = db.collection("records").stream()
-
-with top_test:
-    st.subheader("Testing here:")
-    top_test.dataframe(record_df)
-
-    # Iterate through the documents and display the fields
-    i = 0 # iterator counter for testing purposes
-    for doc in docs:
-        st.markdown(f"Id del documento {doc.id}:")
-        data = doc.to_dict()
-        if data is not None:
-            for key, value in data.items():
-                if key in ("timestamp", "mae"):
-                    st.markdown(f"{key}: {value}")
-        else:
-            st.warning("The document does not contain data or could not be read correctly.")
-        i += 1 
-        if i >= 5: break
-
-    # # Then query to list all users
-    # records_ref = db.collection('records')
-
-    # for doc in records_ref.stream():
-    #     st.write(doc.id)
-    #     st.write('{} => {}'.format(doc.id, doc.to_dict()['mse']))
