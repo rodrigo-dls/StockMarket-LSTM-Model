@@ -23,45 +23,67 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 # Cloud Database connection
 from google.cloud import firestore
 
-# tf.random.set_seed(4)
+# <----------- Mirar -----------> 
+#  Este bien fijar la randomibilidad para el uso de la aplicacion?
+tf.random.set_seed(4)
 
-# Page configuration
-st.set_page_config(
-    page_title="Stock Market Predictor App",
-    page_icon="📈",
-    layout="wide"
-)
+# ***************
+# Cache
+# ***************
 
-# Authenticate to Firestore with the JSON account key.
-db = firestore.Client.from_service_account_json("firestore-key.json")
+# <----------- Mirar -----------> 
+# La fc en cache para conectar al db da error, vale la pena hacerlo?
 
-# Create a reference to the Google post.
-doc_ref = db.collection("records").document("tjuxpBn3KLlBPyMU0qio")
+# @st.cache_data
+# def connect_db(credential_file):
+#     # Authenticate to Firestore DB with the JSON account key.
+#     db = firestore.Client.from_service_account_json(credential_file)
+#     return db
 
-# Then get the data at that reference.
-doc = doc_ref.get()
-
-# # Cargar el dataset existente si lo hay
-# try:
-#     df = pd.read_csv("training_records.csv")
-# except FileNotFoundError:
-#     # Si el archivo no existe, lo creamos con las columnas
-#     df = pd.DataFrame(columns=["feature", "n_epochs", "n_batch", "n_neurons"])
-
-
-
+# <-------- Hasta aca----------->
 
 @st.cache_data
 def get_data_with_date_index(filename):
+    """
+    Import csv data with "Date" column as the Index
+
+    Returns:
+        dataFrame
+    """
     data = pd.read_csv(filename, index_col="Date", parse_dates=["Date"])
     return data
 
-
 @st.cache_data
 def register_training_data(input_feature, n_epochs, n_batch, units_number, metrics_dict, record_df):
-    # Get the current date and time
+    """
+    Load training data into the database.
+
+    Returns:
+        dataFrame: dataFrame of records record_df
+    """
+
+    # Get the current datetime in string format
     timestamp = datetime.datetime.now()
-    formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S') # format the date and time as a string
+    formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S') # format the date and time into a string
+
+    # <----------- Mirar -----------> 
+    # Es necesario crear esta funcion? Donde mas la usaria? Porque quiero cargar las fechas en formato string y no fechas
+
+    # @st.cache_data
+    # def get_formatted_timestamp():
+    #     """
+    #     Get the current datetime in string format.
+
+    #     Returns:
+    #         str: Formatted timestamp (YYYY-MM-DD HH:mm:ss).
+    #     """
+    #     timestamp = datetime.datetime.now()
+    #     formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+    #     return formatted_timestamp
+    
+    # current_timestamp = get_formatted_timestamp()
+
+    # <-------- Hasta aca----------->
 
     # Store selected parameters
     new_inputs = [input_feature, n_epochs, n_batch, units_number]
@@ -77,26 +99,16 @@ def register_training_data(input_feature, n_epochs, n_batch, units_number, metri
     # Add new row to record_df
     record_df.loc[len(record_df.index)] = new_row
 
-    doc_ref = db.collection('records').document()
-    doc_ref.set({
-        'feature': input_feature,
-        'mse': new_metrics[0],
-        'mae': new_metrics[1],
-        'r2': new_metrics[2],
-        'n_batch': n_batch,
-        'n_epochs': n_epochs,
-        'n_neurons': units_number,
-        'timestamps': formatted_timestamp
-    })
-
     return record_df
 
-# @st.cache_data
-# def update_df(new_df, old_df):
-#     if not new_df.loc[len(record_df.index)-1] == old_df.loc[len(record_df.index)-1]:
-
-# @st.cache_data
+@st.cache_data
 def create_model(input_dim, output_dim, na):
+    """
+    Create LSTM Recurrent Neural Network
+
+    Returns:
+        model: compiled LSTM model
+    """
     model = Sequential()
     model.add(LSTM(units=na, input_shape=input_dim))    # LSTM Layer
     model.add(Dense(units=output_dim))  # Output Layer (without activation function)
@@ -104,8 +116,17 @@ def create_model(input_dim, output_dim, na):
     return model
 
 # ***************
-# App Strutcture
+# App Configuration & Structure
 # ***************
+
+st.set_page_config(
+    # Page configuration
+    page_title="Stock Market Predictor App",
+    page_icon="📈",
+    layout="wide"
+)
+
+# App Sections
 top_test = st.container()
 header = st.container()
 dataset = st.container()
@@ -118,6 +139,7 @@ training_record = st.container()
 # ***************
 # Header
 # ***************
+
 with header:
     st.title("Interactive Stock Price Predictor: Customize Your Forecasts")
     st.markdown(
@@ -136,8 +158,12 @@ with header:
 # ***************
 # Dataset
 # ***************
-data = get_data_with_date_index("AAPL_2006-01-01_to_2018-01-01.csv")
+
+filename = "AAPL_2006-01-01_to_2018-01-01.csv"
+data = get_data_with_date_index(filename)
+
 with dataset:
+    # Text
     st.header("Apple Stock Market Dataset")
     st.markdown(
         "I found this dataset on Kaggle. [Link to dataset](https://www.kaggle.com/dataset)"
@@ -146,10 +172,10 @@ with dataset:
     # Table
     st.dataframe(data, height=230)
 
-    fig_col1, fig_col2 = st.columns(2)
     # Visualization
     st.subheader("Dataset Visualization")
-    with fig_col1:
+    fig_1 = st.container()
+    with fig_1:
         fig = px.line(
             data.tail(100),
             x=data.tail(100).index,
@@ -163,23 +189,11 @@ with dataset:
         )
         st.write(fig)
 
-    # with fig_col2:
-    #     fig = px.line(
-    #         data.tail(100),
-    #         x=data.tail(100).index,
-    #         y=["Open", "Close"],
-    #         title="Evolution of Open and Close stock price over the last 100 days of the dataset",
-    #         line_shape="linear",
-    #         line_dash_sequence=["solid"],
-    #     )
-    #     fig.update_layout(  # adjust reference box position
-    #         legend=dict(x=0.75, y=0.15, title=None), xaxis_title="Date", yaxis_title="Value"
-    #     )
-    #     st.write(fig)
-
 # ***************
 # Features
 # ***************
+
+# Text description fo the data features
 with features:
     st.header("The features")
     st.markdown("You can test the model using any of the following features:")
@@ -195,11 +209,13 @@ with features:
 # ***************
 # Model training
 # ***************
+
 with model_training:
+    # Text
     st.header("Build the model!")
     st.markdown("Here you get to choose the hyperparameters of the model and see how the performance changes!")
 
-    # Set feature and hyperparameters
+    # Collect feature and hyperparameters for the model training
     input_feature = st.selectbox(
         "Which feature should be used as the input feature?",
         options=["High", "Low", "Open", "Close"],
@@ -231,9 +247,11 @@ validation_set = data.loc["2017":, input_feature]
 sc = MinMaxScaler(feature_range=(0, 1))
 training_set_sc = sc.fit_transform(pd.DataFrame(training_set))
 
-# Define data size for the model
+# Define data size for the model (Could be a function)
 time_step = 60  # block size
 m = len(training_set_sc)  # iteration limit
+
+# Create X_train & Y_train
 X_train = []
 Y_train = []
 for i in range(time_step, m):
@@ -248,21 +266,21 @@ X_train = np.reshape(
     X_train, (X_train.shape[0], X_train.shape[1], 1)
 )  # reshapes it to feed it to the model
 
-# Create the model
+# Define the model hyperparameters
 input_dim = (X_train.shape[1], 1)  # (timesteps, features)
 output_dim = 1
 na = units_number  # number of units (neurons)
 
+# Create the model
 model = create_model(input_dim, output_dim, na)
 
 # Train the model
-model.fit(X_train, Y_train, epochs=n_epochs, batch_size=n_batch)
-# model = train_model(model, X_train, Y_train, n_epochs, n_batch)
-
+model.fit(X_train, Y_train, epochs=n_epochs, batch_size=n_batch) # type: ignore
 
 # ***************
 # Prediction
 # ***************
+
 # Validation Data Normalization
 validation_set_sc = sc.transform(pd.DataFrame(validation_set))
 
@@ -277,13 +295,15 @@ X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
 prediction = model.predict(X_test)
 prediction = sc.inverse_transform(prediction)  # inverts normalization
 
-
 # ***************
 # Metrics
 # ***************
-Y_test = validation_set[time_step:] # gets rigth size validation dataset
+
+# Collect formatted validation and prediction datasets (Pandas Series)
+Y_test = validation_set[time_step:] # get rigth size validation dataset
 prediction_ds = pd.Series(prediction[:, 0], index=Y_test.index)  # gets rigth format prediction dataset
 
+# Create metrics
 metrics_dict = {
     "mse": {
         "name": "Mean Squared Error (MSE)",
@@ -303,8 +323,8 @@ metrics_dict = {
 }
 
 with metrics:
-    st.subheader("Metrics of the Model")
-    # m1, m2, m3 = st.columns(3) # create three columns
+    # Text
+    st.header("Metrics of the Model")
     display = st.empty() # creating a single-element container
     with display.container():
         m1, m2, m3 = st.columns(3) # create three columns
@@ -319,6 +339,7 @@ with metrics:
 # ***************
 # Visualization of Results
 # ***************
+
  # Create dataframe for viz
 res = pd.DataFrame({"Validation": Y_test, "Prediction": prediction_ds})
 with viz:
@@ -358,50 +379,22 @@ with viz:
 # ***************
 # Training Record
 # ***************
-# # Store selected parameters
-# new_inputs = [
-#         input_feature,
-#         n_epochs,
-#         n_batch,
-#         units_number
-#     ]
 
-# Store new metrics
-# new_metrics = []
-metric_columns = []
+# Create record_df cols name list
+input_columns =  ["feature","n_epochs","n_batch","n_neurons"] # list of hyperparameter names
+metric_columns = [] # list of metric names
 for metric, meta in metrics_dict.items():
-    # new_metrics.append(meta['value'])
-    # st.markdown(f"{new_metrics}")
-    metric_columns.append(metric)
-    # st.markdown(f"{metric_columns}")
-    # st.markdown("\n")
-
-
-# Create df columns array
-input_columns =  ["feature","n_epochs","n_batch","n_neurons"]
-
-record_columns =  ["timestamp"] + input_columns + metric_columns
+    metric_columns.append(metric) # get string metric names
+record_columns =  ["timestamp"] + input_columns + metric_columns # create df columns name list
 
 # Create record df
 record_df = pd.DataFrame(columns = record_columns)
-# Cargar dataset con los records: record_df = load_record_df()
 
-# Create new record
-# new_row = new_inputs + new_metrics
-# record_df.loc[len(record_df.index)] = new_row   # adds new row to df
+# Load existing record from DB to record_df (use try/assert to avoid error for DataFrame not found)
 
 record_df = register_training_data(input_feature, n_epochs, n_batch, units_number, metrics_dict, record_df)
-# new_row = pd.DataFrame(
-#     {
-#         "feature": [input_feature],
-#         "n_epochs": [n_epochs],
-#         "n_batch": [n_batch],
-#         "n_neurons": [units_number],
-#     }
-# )
-# 
-# df = df.append(new_row, ignore_index=True)
 
+# Mirar todo despues de aca ---------------> principalmente conexion con db
 
 with training_record:
     st.subheader("Training Record")
@@ -412,11 +405,61 @@ with training_record:
     # Mostrar el DataFrame actualizado
     st.dataframe(record_df)
 
-top_test.dataframe(record_df)
+
+# Add new data to DB
+
+# Get the current datetime in string format
+timestamp = datetime.datetime.now()
+formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S') # format the date and time as a string
+
+# Get metrics values
+metric_values = [] # list of metric values
+for metric, meta in metrics_dict.items():
+    metric_values.append(meta['value']) # get string metric names
+
+# Connect Firestore DB
+# db = connect_db("firestore-key.json")
+db = firestore.Client.from_service_account_json("firestore-key.json")
+
+# Select collection to store data
+doc_ref = db.collection('records').document()
+
+# Load new data
+doc_ref.set({
+    'feature': input_feature,
+    'mse': metric_values[0],
+    'mae': metric_values[1],
+    'r2': metric_values[2],
+    'n_batch': n_batch,
+    'n_epochs': n_epochs,
+    'n_neurons': units_number,
+    'timestamp': formatted_timestamp
+})
+
+# Get all documents within the collection
+docs = db.collection("records").stream()
 
 with top_test:
-    # Then query to list all users
-    records_ref = db.collection('records')
+    st.subheader("Testing here:")
+    top_test.dataframe(record_df)
 
-    for doc in records_ref.stream():
-        st.write('{} => {}'.format(doc.id, doc.to_dict()['mse']))
+    # Iterate through the documents and display the fields
+    i = 0 # iterator counter for testing purposes
+    for doc in docs:
+        st.markdown(f"Id del documento {doc.id}:")
+        data = doc.to_dict()
+        if data is not None:
+            for key, value in data.items():
+                if key in ("timestamp", "mae"):
+                    st.markdown(f"{key}: {value}")
+        else:
+            st.warning("The document does not contain data or could not be read correctly.")
+        i += 1 
+        if i >= 5: break
+
+    # # Then query to list all users
+    # records_ref = db.collection('records')
+
+    # for doc in records_ref.stream():
+    #     st.write(doc.id)
+    #     st.write('{} => {}'.format(doc.id, doc.to_dict()['mse']))
