@@ -54,9 +54,9 @@ def get_data_with_date_index(filename):
     return data
 
 @st.cache_data
-def register_training_data(input_feature, n_epochs, n_batch, units_number, metrics_dict, record_df):
+def add_new_training_data(input_feature, n_epochs, n_batch, units_number, metrics_dict, record_df):
     """
-    Load training data into the database.
+    Registers training data into a dataframe.
 
     Returns:
         dataFrame: dataFrame of records record_df
@@ -390,23 +390,21 @@ record_columns =  ["timestamp"] + input_columns + metric_columns # create df col
 # Create record df
 record_df = pd.DataFrame(columns = record_columns)
 
-# Load existing record from DB to record_df (use try/assert to avoid error for DataFrame not found)
+# <------- Add step here ------>
+# Retrieve data from DB and add to record_df (use try/assert to avoid error for DataFrame not found)
 
-record_df = register_training_data(input_feature, n_epochs, n_batch, units_number, metrics_dict, record_df)
-
-# Mirar todo despues de aca ---------------> principalmente conexion con db
+record_df = add_new_training_data(input_feature, n_epochs, n_batch, units_number, metrics_dict, record_df)
 
 with training_record:
     st.subheader("Training Record")
     st.markdown("Here you can view a record of each test. Feel free to experiment as many times as you'd like and then make an informed decision about the best parameters for your specific use-case.")
-    # for metric, meta in metrics_dict.items():
-    #     st.markdown(f"{meta['name']}: {meta['value']}")
 
-    # Mostrar el DataFrame actualizado
+    # Show updated dataFrame
     st.dataframe(record_df)
 
-
-# Add new data to DB
+# ***********************************
+# Update DB with new training data
+# ***********************************
 
 # Get the current datetime in string format
 timestamp = datetime.datetime.now()
@@ -418,7 +416,6 @@ for metric, meta in metrics_dict.items():
     metric_values.append(meta['value']) # get string metric names
 
 # Connect Firestore DB
-# db = connect_db("firestore-key.json")
 db = firestore.Client.from_service_account_json("firestore-key.json")
 
 # Select collection to store data
@@ -435,6 +432,10 @@ doc_ref.set({
     'n_neurons': units_number,
     'timestamp': formatted_timestamp
 })
+
+# ***********************************
+# Retrieve all data from DB (still on test stage)
+# ***********************************
 
 # Get all documents within the collection
 docs = db.collection("records").stream()
