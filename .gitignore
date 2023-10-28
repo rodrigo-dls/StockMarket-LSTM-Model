@@ -2,3 +2,4 @@
 /.venv
 .venv/
 firestore-key.json
+.vscode/settings.json
