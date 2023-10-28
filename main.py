@@ -69,7 +69,10 @@ def add_new_training_data(input_feature, n_epochs, n_batch, units_number, metric
 
     return record_df
 
-@st.cache_data
+# ***************
+# Auxiliar functions
+# ***************
+
 def create_model(input_dim, output_dim, na):
     """
     Create LSTM Recurrent Neural Network
