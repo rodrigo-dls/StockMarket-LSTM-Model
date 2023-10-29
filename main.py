@@ -40,34 +40,34 @@ def get_data_with_date_index(filename):
     data = pd.read_csv(filename, index_col="Date", parse_dates=["Date"])
     return data
 
-@st.cache_data
-def add_new_training_data(input_feature, n_epochs, n_batch, units_number, metrics_dict, record_df):
-    """
-    Registers training data into a dataframe.
+# @st.cache_data
+# def add_new_training_data(input_feature, n_epochs, n_batch, units_number, metrics_dict, record_df):
+#     """
+#     Registers training data into a dataframe.
 
-    Returns:
-        dataFrame: dataFrame of records record_df
-    """
+#     Returns:
+#         dataFrame: dataFrame of records record_df
+#     """
 
-    # Get the current datetime in string format
-    timestamp = datetime.datetime.now()
-    formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S') # format the date and time into a string
+#     # Get the current datetime in string format
+#     timestamp = datetime.datetime.now()
+#     formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S') # format the date and time into a string
 
-    # Store selected parameters
-    new_inputs = [input_feature, n_epochs, n_batch, units_number]
+#     # Store selected parameters
+#     new_inputs = [input_feature, n_epochs, n_batch, units_number]
 
-    # Store new metrics
-    new_metrics = []
-    for _, meta in metrics_dict.items():
-        new_metrics.append(meta['value'])
+#     # Store new metrics
+#     new_metrics = []
+#     for _, meta in metrics_dict.items():
+#         new_metrics.append(meta['value'])
 
-    # Create new record
-    new_row =  [formatted_timestamp] + new_inputs + new_metrics
+#     # Create new record
+#     new_row =  [formatted_timestamp] + new_inputs + new_metrics
 
-    # Add new row to record_df
-    record_df.loc[len(record_df.index)] = new_row
+#     # Add new row to record_df
+#     record_df.loc[len(record_df.index)] = new_row
 
-    return record_df
+#     return record_df
 
 # ***************
 # Auxiliar functions
@@ -347,32 +347,6 @@ with viz:
     )
     st.plotly_chart(fig)
 
-# ***************
-# Training Record
-# ***************
-
-# Create record_df cols name list
-input_columns =  ["feature","n_epochs","n_batch","n_neurons"] # list of hyperparameter names
-metric_columns = [] # list of metric names
-for metric, meta in metrics_dict.items():
-    metric_columns.append(metric) # get string metric names
-record_columns =  ["timestamp"] + input_columns + metric_columns # create df columns name list
-
-# Create record df
-record_df = pd.DataFrame(columns = record_columns)
-
-# <------- Add step here ------>
-# Retrieve data from DB and add to record_df (use try/assert to avoid error for DataFrame not found)
-
-record_df = add_new_training_data(input_feature, n_epochs, n_batch, units_number, metrics_dict, record_df)
-
-with training_record:
-    st.subheader("Training Record")
-    st.markdown("Here you can view a record of each test. Feel free to experiment as many times as you'd like and then make an informed decision about the best parameters for your specific use-case.")
-
-    # Show updated dataFrame
-    st.dataframe(record_df)
-
 # ***********************************
 # Update DB with new training data
 # ***********************************
@@ -404,7 +378,18 @@ doc_ref.set({
     'timestamp': formatted_timestamp
 })
 
-# ***********************************
-# Retrieve all data from DB (still on test stage)
-# ***********************************
+# ***************
+# Training Record
+# ***************
 
+# Create a dataFrame with all documents retrieved from DB 
+docs = db.collection("records").order_by("timestamp", direction=firestore.Query.DESCENDING).stream()
+docs_list = [doc.to_dict() for doc in docs]
+docs_df = pd.DataFrame(docs_list)
+
+with training_record:
+    st.subheader("Training Record")
+    st.markdown("Here you can view a record of each test. Feel free to experiment as many times as you'd like and then make an informed decision about the best parameters for your specific use-case.")
+    
+    # Show updated records dataFrame
+    st.dataframe(docs_df)
