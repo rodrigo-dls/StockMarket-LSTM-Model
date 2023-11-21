@@ -16,11 +16,6 @@ A user-friendly application leveraging LSTM neural networks in Python with Keras
 * [Contact](#contact)
 <!-- * [License](#license) -->
 
-
-## General Information
-
-The application serves as an interactive platform for experimenting with LSTM neural networks by allowing users to modify training hyperparameters. With each experiment, the app provides performance metrics and visualizations of the network's predictions. Furthermore, all data is stored in a cloud-hosted NoSQL database, facilitating subsequent analysis to determine optimal hyperparameters for neural network performance.
-
 ## General Information
 
 ### Description
@@ -99,11 +94,6 @@ The home screen of the mobile app has five main sections:
 
 5. A section to showcase the dataset resulting from the app experimentation. This section displays the dataset that was created as a result of the app's experimentation. This dataset can be used to train other models or to perform further analysis.
 ![App_screenshot__training_record](./img/screenshot-04.png)
-
-## Setup
-What are the project requirements/dependencies? Where are they listed? A requirements.txt or a Pipfile.lock file perhaps? Where is it located?
-
-Proceed to describe how to install / setup one's local environment / get started with the project.
 
 ## Setup
 1. **Requirements:**
